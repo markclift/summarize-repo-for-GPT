@@ -16,12 +16,14 @@ This Python script allows you to download the contents of all files in a GitHub 
 2. Install the required dependencies by running the following command:
 ```python
 pip install requirements.txt
+```
 
 ## Usage
 
 1. Run the script using the following command:
 ```python
 python3 summarize_repo.py
+```
 
 2. The script will prompt you to enter the GitHub repository URL.
 
