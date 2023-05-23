@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 # Third-party imports
 from dotenv import load_dotenv
+import tiktoken
 from github import Github, RateLimitExceededException
 from github.GithubException import UnknownObjectException
 from kivy.core.window import Window
@@ -129,10 +130,11 @@ BoxLayout:
                 spacing: '20dp'
 
                 MDLabel:
-                    text: 'Enter filename to save output to:'
+                    id: token_count_txt
+                    text: 'The amount of tokens in the text is: '
                     halign: 'center'
                     size_hint_y: None
-
+                
                 MDTextField:
                     id: filename_input
                     hint_text: 'Enter filename'
@@ -281,9 +283,17 @@ class MainApp(MDApp):
             Clock.schedule_once(lambda dt: self.dialog.dismiss())
 
     def show_filename_input_screen(self):
+        token_count = self.num_tokens_from_string(self.output, "cl100k_base")
+        self.root.ids.token_count_txt.text = f"The amount of tokens in the text is: {token_count}\n\nEnter filename to save output to:"
         self.root.ids.screen_manager.current = 'filename_input_page'
         self.filename_input.focus = True
 
+    def num_tokens_from_string(self, string: str, encoding_name: str) -> int:
+        """Returns the number of tokens in a text string."""
+        encoding = tiktoken.get_encoding(encoding_name)
+        num_tokens = len(encoding.encode(string))
+        return num_tokens
+    
     def on_filename_input(self):
         self.filename = self.filename_input.text
         self.manager_open()
