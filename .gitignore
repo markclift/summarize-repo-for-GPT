@@ -1,6 +1,7 @@
 .env
 /.venv
 /.vscode
-summarize_repo.spec
 /dist
 /build
+.DS_Store
+__pycache__/
