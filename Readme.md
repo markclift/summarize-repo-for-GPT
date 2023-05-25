@@ -1,45 +1,46 @@
-# GitHub Repo File Downloader
+# GitHub Repo Summarizer
 
-This Python script allows you to download the contents of specific types of files in a GitHub repository.
+The goal of this project is to be able to easily summarize a Github repo in a way that can be used as input to LLMs.
 
-## Prerequisites
-
-- Python 3.x
-- `tkinter` module
-- `github` module
-- `requests` module
-- `dotenv` module
+As of now, this Python application provides a KivyMD UI for selecting a repo, specifying file extensions to download and downloading and consolidating the files into one text file and displays the contained tokens. Most of the code and this readme file was produced by Chat-GPT.
 
 ## Installation
 
-1. Clone the repository or download the script directly.
-2. Install the required dependencies by running the following command:
+1. Clone this repository to your local machine: 
+```python
+https://github.com/markclift/summarize-repo-for-GPT.git
+```
+
+2. Install the required dependencies:
 ```python
 pip install -r requirements.txt
 ```
 
-## Usage
-
-1. Run the script using the following command:
+3. Create a `.env` file in the root directory of the project, and add your GitHub token in the following format:
 ```python
-python3 summarize_repo.py
+GITHUB_TOKEN='your_github_token_here'
 ```
 
-2. The script will prompt you to enter the GitHub repository URL.
+4. Run:
+```python
+python summarize_repo.py
+```
 
-3. After entering the URL, the script will authenticate using the GitHub token stored in the `.env` file.
+## Usage
 
-4. It will recursively go through the repository to gather all distinct file extensions (excluding those in the IGNORED_FILES list).
+Enter the URL of the GitHub repository you wish to download and summarize. The application will retrieve all file names from the repository, excluding certain predefined ignored files (see `github_utils.py` for the list of ignored files). 
 
-5. A GUI will be opened listing all file extensions in the repository. All extensions will be ticked by default. You can select which file types you want to include in the download by ticking or unticking the boxes next to the extensions.
+You can select which file extensions you wish to retrieve. The app will display the total number of tokens in the downloaded content. 
 
-6. Once you confirm your selection, the script will fetch the contents of only the files of the selected types.
-
-7. You will be prompted to select the destination path and provide a filename. The contents of the files will then be saved to a text file at the chosen location.
-
-8. The text file will contain the file paths and their respective contents, separated by the "===============================" delimiter.
+Enter a filename to save the downloaded content as a .txt file.
 
 **Note:** Ensure that you have the necessary access permissions to the repository.
+
+## TODO:
+1. Move ignore files from hard-coded to the UI
+2. Move selection of ignore files & extensions to a savable settings menu
+3. Add the option to split the output into something within a certain token limit
+4. Add LLM-generated summarization capabilities!
 
 ## License
 
