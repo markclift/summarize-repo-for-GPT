@@ -1,2 +1,6 @@
 .env
 /.venv
+/.vscode
+summarize_repo.spec
+/dist
+/build
