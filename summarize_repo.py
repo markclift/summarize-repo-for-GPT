@@ -4,6 +4,7 @@
 import os
 import threading
 from urllib.parse import urlparse
+from pathlib import Path
 
 # Third-party imports
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ from kivy.logger import Logger
 from kivymd.uix.selectioncontrol import MDCheckbox
 
 # Local imports
-from github_utils import get_all_files_recursive
+from utils import get_all_filepaths_in_local_dir, get_all_filepaths_in_github_repo, get_all_file_contents_from_github, get_all_file_contents_from_directory
 
 # Initialize the local logger
 import logging
@@ -44,7 +45,7 @@ BoxLayout:
     padding: '8dp'
 
     MDTopAppBar:
-        title: 'Github Repo Downloader'
+        title: 'Repo Summarizer'
         md_bg_color: app.theme_cls.primary_color
         background_palette: 'Primary'
         elevation: 10
@@ -64,7 +65,7 @@ BoxLayout:
                 spacing: '20dp'
 
                 MDLabel:
-                    text: 'Enter the Github Repo URL:'
+                    text: 'Enter the Github Repo URL or local directory:'
                     halign: 'center'
                     size_hint_y: None
 
@@ -77,6 +78,7 @@ BoxLayout:
                     width: 600
                     multiline: False
                     size_hint_y: None
+                    on_text_validate: app.submit()
 
                 MDRaisedButton:
                     id: submit_button
@@ -187,50 +189,56 @@ class MainApp(MDApp):
         self.filename_input = self.root.ids.filename_input
         self.filename_input.text = "output.txt"  # Set the default value
         return self.root
-
-    def get_repo_and_all_extensions(self, g):
-        try:
-            self.repo = g.get_repo(self.repo_name)
-            _, all_extensions = get_all_files_recursive(self.repo)
-
-        except RateLimitExceededException:
-            Clock.schedule_once(lambda dt: toast("GitHub API rate limit exceeded. Please wait a while before retrying."))
-            Clock.schedule_once(lambda dt: self.dialog.dismiss(), 0.5)  # dismiss after a short delay
-        except UnknownObjectException:
-            Clock.schedule_once(lambda dt: toast("Invalid repository URL. Please check and try again."))
-            Clock.schedule_once(lambda dt: self.dialog.dismiss(), 0.5)  # dismiss after a short delay
-        except Exception as e:
-            Clock.schedule_once(lambda dt: toast(f"An error occurred: {str(e)}"))
-            logger.error(f'Error in get_repo_and_all_extensions: {e}')
-            Clock.schedule_once(lambda dt: self.dialog.dismiss(), 0.5)  # dismiss after a short delay
-        else:
+    
+    def get_all_filepaths(self, g):
+        if os.path.isdir(self.repo_name):
+            self.files_to_download, all_extensions = get_all_filepaths_in_local_dir(self.repo_name)
             # Move UI updates back to the main thread
             Clock.schedule_once(lambda dt: self.dialog.dismiss())
             Clock.schedule_once(lambda dt: self.populate_extensions(all_extensions))
+        
+        else:
+            try:
+                self.repo = g.get_repo(self.repo_name)
+                self.files_to_download, all_extensions = get_all_filepaths_in_github_repo(self.repo)
+
+            except RateLimitExceededException:
+                Clock.schedule_once(lambda dt: toast("GitHub API rate limit exceeded. Please wait a while before retrying."))
+                Clock.schedule_once(lambda dt: self.dialog.dismiss(), 0.5)  # dismiss after a short delay
+            except UnknownObjectException:
+                Clock.schedule_once(lambda dt: toast("Invalid repository URL. Please check and try again."))
+                Clock.schedule_once(lambda dt: self.dialog.dismiss(), 0.5)  # dismiss after a short delay
+            except Exception as e:
+                Clock.schedule_once(lambda dt, error=e: toast(f"An error occurred: {str(error)}"))
+                logger.error(f'Error in get_all_filepaths_in_github_repo: {e}')
+                Clock.schedule_once(lambda dt: self.dialog.dismiss(), 0.5)  # dismiss after a short delay
+            else:
+                # Move UI updates back to the main thread
+                Clock.schedule_once(lambda dt: self.dialog.dismiss())
+                Clock.schedule_once(lambda dt: self.populate_extensions(all_extensions))
 
     def submit(self):
         self.repo_url = self.root.ids.repo_input.text
 
         if not self.repo_url.strip():
-            toast("Please enter a URL")
+            toast("Please enter a URL or local directory path")
             return
 
         parsed_url = urlparse(self.repo_url)
-        if not all([parsed_url.scheme, parsed_url.netloc, parsed_url.path]):
-            toast("Invalid URL")
+        if os.path.isdir(self.repo_url):
+            self.repo_name = self.repo_url
+        elif all([parsed_url.scheme, parsed_url.netloc, parsed_url.path]) and parsed_url.netloc in ['github.com', 'www.github.com']:
+            self.repo_name = parsed_url.path.lstrip('/')
+        else:
+            toast("Invalid URL or local directory path")
             return
 
-        if parsed_url.netloc not in ['github.com', 'www.github.com']:
-            toast("URL does not appear to be a GitHub URL")
-            return
-
-        self.repo_name = parsed_url.path.lstrip('/')
-        g = Github(USER_TOKEN)
+        g = Github(USER_TOKEN) if not os.path.isdir(self.repo_url) else None
 
         self.dialog = MDDialog(title=f"Reading {self.repo_name} repo...", auto_dismiss=False,)
         self.dialog.open()
 
-        threading.Thread(target=self.get_repo_and_all_extensions, args=(g,), daemon=True).start()
+        threading.Thread(target=self.get_all_filepaths, args=(g,), daemon=True).start()
 
     def populate_extensions(self, extensions):
         self.root.ids.extensions_label.text = f"Select the file extensions you wish to retrieve from the {self.repo_name} repo"
@@ -270,17 +278,20 @@ class MainApp(MDApp):
         threading.Thread(target=self.get_files_with_selected_extensions, args=(selected_extensions,), daemon=True).start()
 
     def get_files_with_selected_extensions(self, selected_extensions):
-        try:
-            output, _ = get_all_files_recursive(self.repo, selected_extensions=selected_extensions)
-            self.output = output
-            # Use Clock to schedule the filename_input_dialog function call to the main thread
+        if os.path.isdir(self.repo_name):
+            self.output = get_all_file_contents_from_directory(self.files_to_download, selected_extensions)
             Clock.schedule_once(lambda dt: self.show_filename_input_screen())
-        except Exception as e:
-            Clock.schedule_once(lambda dt: toast(f"An error occurred: {str(e)}"))
-            logger.error(f'Error in get_files_with_selected_extensions: {e}')
-        finally:
-            # Close the dialog after the work is done
             Clock.schedule_once(lambda dt: self.dialog.dismiss())
+        else:    
+            try:
+                self.output = get_all_file_contents_from_github(self.files_to_download, selected_extensions)
+                Clock.schedule_once(lambda dt: self.show_filename_input_screen())
+            except Exception as e:
+                Clock.schedule_once(lambda dt, error=e: toast(f"An error occurred: {str(error)}"))
+                logger.error(f'Error in get_files_with_selected_extensions: {e}')
+            finally:
+                # Close the dialog after the work is done
+                Clock.schedule_once(lambda dt: self.dialog.dismiss())
 
     def show_filename_input_screen(self):
         token_count = self.num_tokens_from_string(self.output, "cl100k_base")
