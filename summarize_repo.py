@@ -21,9 +21,10 @@ from kivymd.uix.filemanager import MDFileManager
 from kivymd.uix.list import IRightBodyTouch, OneLineAvatarIconListItem
 from kivy.logger import Logger
 from kivymd.uix.selectioncontrol import MDCheckbox
+from api import generate_summary
 
 # Local imports
-from utils import get_all_filepaths_in_local_dir, get_all_filepaths_in_github_repo, get_all_file_contents_from_github, get_all_file_contents_from_directory
+from utils import get_all_filepaths_in_local_dir, get_all_filepaths_in_github_repo, read_file_contents
 
 # Initialize the local logger
 import logging
@@ -272,26 +273,25 @@ class MainApp(MDApp):
     def on_extension_selection(self):
         selected_extensions = {ext for ext, checkbox in self.check_vars.items() if checkbox.active}
 
-        self.dialog = MDDialog(title=f"Downloading files from the {self.repo_name} repo...")
+        self.dialog = MDDialog(title=f"Downloading and summarizing files from the {self.repo_name} repo...")
         self.dialog.open()
 
-        threading.Thread(target=self.get_files_with_selected_extensions, args=(selected_extensions,), daemon=True).start()
+        threading.Thread(target=self.summarize_files, args=(selected_extensions,), daemon=True).start()
 
-    def get_files_with_selected_extensions(self, selected_extensions):
-        if os.path.isdir(self.repo_name):
-            self.output = get_all_file_contents_from_directory(self.files_to_download, selected_extensions)
-            Clock.schedule_once(lambda dt: self.show_filename_input_screen())
-            Clock.schedule_once(lambda dt: self.dialog.dismiss())
-        else:    
-            try:
-                self.output = get_all_file_contents_from_github(self.files_to_download, selected_extensions)
-                Clock.schedule_once(lambda dt: self.show_filename_input_screen())
-            except Exception as e:
-                Clock.schedule_once(lambda dt, error=e: toast(f"An error occurred: {str(error)}"))
-                logger.error(f'Error in get_files_with_selected_extensions: {e}')
-            finally:
-                # Close the dialog after the work is done
-                Clock.schedule_once(lambda dt: self.dialog.dismiss())
+    def summarize_files(self, selected_extensions):
+        output = ''
+        for path in self.files_to_download:
+            _, ext = os.path.splitext(path)
+            if ext in selected_extensions:
+                print("Summarizing: " + path)
+                file_contents = read_file_contents(path)
+                summary = generate_summary(file_contents)
+                output += "File path: " + path + '\nFile summary:\n\n'
+                output += summary
+                output += "\n\n================\n\n"
+
+        Clock.schedule_once(lambda dt: self.show_filename_input_screen())
+        Clock.schedule_once(lambda dt: self.dialog.dismiss())
 
     def show_filename_input_screen(self):
         token_count = self.num_tokens_from_string(self.output, "cl100k_base")

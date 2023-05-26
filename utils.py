@@ -49,26 +49,11 @@ def get_all_filepaths_in_github_repo(repo, path=''):
             filepaths.append(content.download_url)
     return filepaths, extensions
 
-def get_all_file_contents_from_github(paths, selected_extensions):
-    output=''
-    for path in paths:
-        _, ext = os.path.splitext(path)
-        if ext in selected_extensions:
-            output += "File path: " + path + '\nFile content:\n\n'
-            output += download_file(path)
-            output += "\n\n================\n\n"
-    return output
-
-def get_all_file_contents_from_directory(paths, selected_extensions):
-    output = ''
-    for path in paths:
-        _, ext = os.path.splitext(path)
-        if ext in selected_extensions:
-            with open(path, 'r') as file:
-                output += "File path: " + path + '\nFile content:\n\n'
-                output += file.read()
-                output += "\n\n================\n\n"
-    return output
+def read_file_contents(path):
+    if os.path.isfile(path):
+        with open(path, 'r') as file:
+            return file.read()
+    else: return download_file(path)
 
 def download_file(file_url):
     response = requests.get(file_url)
