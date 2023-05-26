@@ -21,7 +21,7 @@ from kivymd.uix.filemanager import MDFileManager
 from kivymd.uix.list import IRightBodyTouch, OneLineAvatarIconListItem
 from kivy.logger import Logger
 from kivymd.uix.selectioncontrol import MDCheckbox
-from api import generate_summary
+from openai_interface import OpenAI_Interface
 
 # Local imports
 from utils import get_all_filepaths_in_local_dir, get_all_filepaths_in_github_repo, read_file_contents
@@ -181,6 +181,7 @@ class ExtensionListItem(OneLineAvatarIconListItem):
         self.add_widget(RightCheckbox())
 
 class MainApp(MDApp):
+    
     def build(self):
         self.theme_cls.primary_palette = 'Blue'
         self.filename = None
@@ -236,7 +237,7 @@ class MainApp(MDApp):
 
         g = Github(USER_TOKEN) if not os.path.isdir(self.repo_url) else None
 
-        self.dialog = MDDialog(title=f"Reading {self.repo_name} repo...", auto_dismiss=False,)
+        self.dialog = MDDialog(title=f"Reading {self.repo_name} repo...", auto_dismiss=False)
         self.dialog.open()
 
         threading.Thread(target=self.get_all_filepaths, args=(g,), daemon=True).start()
@@ -273,29 +274,37 @@ class MainApp(MDApp):
     def on_extension_selection(self):
         selected_extensions = {ext for ext, checkbox in self.check_vars.items() if checkbox.active}
 
-        self.dialog = MDDialog(title=f"Downloading and summarizing files from the {self.repo_name} repo...")
+        self.dialog = MDDialog(title=f"Downloading and summarizing files from the {self.repo_name} repo...", auto_dismiss=False)
         self.dialog.open()
 
         threading.Thread(target=self.summarize_files, args=(selected_extensions,), daemon=True).start()
 
     def summarize_files(self, selected_extensions):
-        output = ''
+        self.input = ''
+        self.output = ''
+        self.openai_interface = OpenAI_Interface()
+        self.total_files = sum([1 for path in self.files_to_download if os.path.splitext(path)[1] in selected_extensions])
+        file_counter = 1
         for path in self.files_to_download:
             _, ext = os.path.splitext(path)
             if ext in selected_extensions:
                 print("Summarizing: " + path)
+                Clock.schedule_once(lambda dt: setattr(self.dialog, 'title', f"Summarizing file {file_counter} of {self.total_files} in the {self.repo_name} repo"), 0)  # Update the dialog's title on the main thread
                 file_contents = read_file_contents(path)
-                summary = generate_summary(file_contents)
-                output += "File path: " + path + '\nFile summary:\n\n'
-                output += summary
-                output += "\n\n================\n\n"
+                self.input += file_contents
+                summary = self.openai_interface.generate_summary(file_contents)
+                self.output += "File path: " + path + '\n\n'
+                self.output += summary
+                self.output += "\n\n================\n\n"
+                file_counter += 1
 
         Clock.schedule_once(lambda dt: self.show_filename_input_screen())
         Clock.schedule_once(lambda dt: self.dialog.dismiss())
 
     def show_filename_input_screen(self):
-        token_count = self.num_tokens_from_string(self.output, "cl100k_base")
-        self.root.ids.token_count_txt.text = f"The amount of tokens in the text is: {token_count}\n\nEnter filename to save output to:"
+        cost = self.openai_interface.get_token_cost()
+        token_count_prompt, token_count_completion = self.openai_interface.get_tokens_total()
+        self.root.ids.token_count_txt.text = f"The amount of tokens in the output is: {token_count_completion}, compared to {token_count_prompt} in the input. Approx cost to summarize: ${cost}\n\nEnter filename to save output to:"
         self.root.ids.screen_manager.current = 'filename_input_page'
         self.filename_input.focus = True
 

@@ -1,8 +1,8 @@
-# GitHub Repo Summarizer
+# Repo Summarizer
 
 The goal of this project is to be able to easily summarize a code repo (either from Github or a local directory) in a way that can be used as input to LLMs.
 
-As of now, this Python application provides a KivyMD UI for selecting a repo, specifying file extensions to include and then calling the OpenAI API to summarize each file and consolidate the summaries into a single text output file. Most of the code and this readme file was produced by Chat-GPT.
+This Python application provides a KivyMD UI for selecting a repo, specifying file extensions to include and then calling the OpenAI API to summarize each file and consolidate the summaries into a single text output file. Most of the code and this readme file was produced by Chat-GPT.
 
 ## Installation
 
@@ -19,7 +19,7 @@ pip install -r requirements.txt
 3. Create a `.env` file in the root directory of the project, and add your GitHub token and OpenAI keys in the following format:
 ```python
 GITHUB_TOKEN='your_github_token_here'
-OPENAI_API_KEY=key
+OPENAI_API_KEY='key'
 ```
 
 4. Run:
@@ -29,11 +29,11 @@ python summarize_repo.py
 
 ## Usage
 
-Enter the path of the local or remote repository you wish to summarize. The application will retrieve all file names from the repository, excluding certain predefined ignored files (see `github_utils.py` for the list of ignored files/folders). 
+Enter the path of the local or remote repository you wish to summarize. The application will retrieve all file names from the repository, excluding certain predefined ignored files (see `utils.py` for the list of ignored files/folders). 
 
 You can then select which file extensions you wish to include in the generated summary.
 
-Enter a filename to save the downloaded content as a .txt file. The app will display the total number of tokens in the final output.
+Enter a filename to save the downloaded content as a .txt file. The app will display the total number of tokens in the input vs output and the approximate cost incurred in the summarization.
 
 **Note:** Ensure that you have the necessary access permissions to the repository.
 
