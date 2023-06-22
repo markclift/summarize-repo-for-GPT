@@ -102,15 +102,33 @@ BoxLayout:
                     size_hint_y: None
 
                 ScrollView:
+                    size_hint_y: 0.85
+                    do_scroll_x: False
+
                     MDList:
                         id: extension_list
                         spacing: -25
 
                 BoxLayout:
+                    orientation: 'horizontal'
                     size_hint_y: None
                     height: self.minimum_height
-                    size_hint_x: None
-                    width: self.minimum_width
+                    padding: '10dp'
+                    
+                    MDCheckbox:
+                        id: ai_summary_checkbox
+                        size_hint: None, None
+                        size: "48dp", "48dp"
+                        active: True
+
+                    MDLabel:
+                        text: 'Use AI to summarize each file'
+                        size_hint_y: None
+                        height: self.texture_size[1]
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: self.minimum_height
                     pos_hint: {'center_x': 0.5}
                     spacing: '10dp'
                     MDRaisedButton:
@@ -121,6 +139,7 @@ BoxLayout:
                         id: ok_button
                         text: 'Ok'
                         on_release: app.on_extension_selection()
+
 
         Screen:
             name: 'filename_input_page'
@@ -187,6 +206,7 @@ class MainApp(MDApp):
         self.filename = None
         self.root = Builder.load_string(KV)
         self.repo_input = self.root.ids.repo_input
+        self.ai_summary_checkbox = self.root.ids.ai_summary_checkbox
         self.repo_input.focus = True
         self.filename_input = self.root.ids.filename_input
         self.filename_input.text = "output.txt"  # Set the default value
@@ -292,7 +312,10 @@ class MainApp(MDApp):
                 Clock.schedule_once(lambda dt: setattr(self.dialog, 'title', f"Summarizing file {file_counter} of {self.total_files} in the {self.repo_name} repo"), 0)  # Update the dialog's title on the main thread
                 file_contents = read_file_contents(path)
                 self.input += file_contents
-                summary = self.openai_interface.generate_summary(file_contents)
+                if self.ai_summary_checkbox.active:
+                    summary = self.openai_interface.generate_summary(file_contents)
+                else:
+                    summary = file_contents
                 self.output += "File path: " + path + '\n\n'
                 self.output += summary
                 self.output += "\n\n================\n\n"
@@ -302,7 +325,7 @@ class MainApp(MDApp):
         Clock.schedule_once(lambda dt: self.dialog.dismiss())
 
     def show_filename_input_screen(self):
-        cost = self.openai_interface.get_token_cost()
+        cost = (self.openai_interface and self.openai_interface.get_token_cost()) or 0
         token_count_prompt, token_count_completion = self.openai_interface.get_tokens_total()
         self.root.ids.token_count_txt.text = f"The amount of tokens in the output is: {token_count_completion}, compared to {token_count_prompt} in the input. Approx cost to summarize: ${cost}\n\nEnter filename to save output to:"
         self.root.ids.screen_manager.current = 'filename_input_page'
